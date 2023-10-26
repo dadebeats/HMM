@@ -40,26 +40,15 @@ class HMM:
 
                 meaning:
                 - train_data[0] = 1st pair of word & tag
+            
+            tag_list:
+                a set of all the tags present in the data set 
         """
         self.init_attributes()
 
-        words = set()
-        tags = set()
-        for sent in train_data:
-            for word, tag in sent:
-                words.add(word)
-                tags.add(tag)
-        
-        self.N = len(tags)
-        self.T = len(words)
-        self.Q = list(tags)
-        self.O = list(words)
-
-        # to do
+        # Calculating both the Tranisition and Emission Matrix
         self.emission_matrix = self._calculate_emission_matrix(train_data, tag_list)
         self.transition_matrix = self._calculate_transition_matrix(train_data, tag_list)
-        pass
-        
 
     def evaluate(self, gold_data: List[List[Tuple[str, str]]]):
         """
@@ -210,7 +199,3 @@ class HMM:
 
         # Return the computed transition matrix
         return transition_matrix
-
-
-
-
