@@ -26,23 +26,20 @@ class HMM:
         self.T = 0 # total words
         self.Q: List = [] # size N
         self.O: List = [] # size T
-        self.A: List[List] = [] # transition_matrix with size N x N
-        self.B = [] # emission_matrix
+        self.transition_matrix: List[List] = [] # transition_matrix with size N x N
+        self.emission_matrix = [] # emission_matrix
         self.phi = [] # size N
 
-    def train(self, train_data: List[List[Tuple[str, str]]]):
+    def train(self, train_data: List[Tuple[str, str]]):
         """
         Input: 
             train_data:
-                list of pairs (word & tag) for each sentence
+                list of pairs (word & tag)
                 eg.
-                [[('The', 'DET'), ('Fulton', 'NOUN'), ...],
-                [],
-                []]
+                [('The', 'DET'), ('Fulton', 'NOUN'), ...]
 
                 meaning:
-                - train_data[0] = List of pairs in the 1st sentence
-                - train_data[0][0] = 1st pair of word & tag of the 1st sentence
+                - train_data[0] = 1st pair of word & tag
         """
         self.init_attributes()
 
@@ -87,25 +84,73 @@ class HMM:
         pass
     
     def get_transition_matrix(self):
-        return self.A
+        return self.transition_matrix
     
     def get_emission_matrix(self):
-        return self.B
+        return self.emission_matrix
     
-    def _calculate_emission_matrix(self):
+    def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
         """
-        Description: How likely a word 'bird' will be a noun
-        Size: total tags x total words N x T (number of rows × number of columns)
+        Calculate the emission matrix, which represents the conditional probabilities of words given tags.
 
-            for example:
+        Input: 
+            train_data:
+                A list of pairs (word & tag).
             
-             | the | aged | bottle | flies | fast
-         ADJ |     |      |        |       |
-         ADV |     |      |        |       |
-            ...
+            tag_list:
+                A set of all the tags.
 
+        Output: 
+            emission_matrix:
+                - Type: Dictionary
+                - Structure : {'tags': {'words': emission probability} }
+                
+                For example: 
+                    {
+                        'Noun': {
+                            'apple': 0.5,
+                            'banana': 0.3,
+                            'tree': 0.2
+                        },
+                        'Verb': {
+                            'run': 0.6,
+                            'jump': 0.4
+                        }
+                    }
         """
-        pass
+        tag_word_counts = {}  # Dictionary to store word counts for each tag
+        tag_counts = {}  # Dictionary to store tag counts
+        emission_matrix = {}  # Dictionary to store the emission matrix
+
+        for word, tag in train_data:
+            
+            # Normalize word by converting it to lowercase
+            word = word.lower()
+            
+            if tag in tag_word_counts:
+                # If the tag exists in tag_word_counts, update word count
+                tag_word_counts[tag][word] = tag_word_counts[tag].get(word, 0) + 1
+            else:
+                # If the tag is encountered for the first time, create a new entry
+                tag_word_counts[tag] = {word: 1}
+            
+            # Update the tag count
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+        for tag in tag_list:
+            temp_matrix = {}  # Dictionary for the current tag
+
+            for word in tag_word_counts.get(tag, {}):
+                word_count = tag_word_counts[tag][word]
+                temp_matrix[word] = word_count / tag_counts[tag]
+
+            # Store the tag's emission probabilities in the emission matrix
+            emission_matrix[tag] = temp_matrix
+
+        return emission_matrix
+
+
+
 
     def _calculate_transition_matrix(self):
         """
