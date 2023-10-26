@@ -26,11 +26,11 @@ class HMM:
         self.T = 0 # total words
         self.Q: List = [] # size N
         self.O: List = [] # size T
-        self.transition_matrix: List[List] = [] # transition_matrix with size N x N
-        self.emission_matrix = [] # emission_matrix
+        self.transition_matrix = {} # transition_matrix
+        self.emission_matrix = {} # emission_matrix
         self.phi = [] # size N
 
-    def train(self, train_data: List[Tuple[str, str]]):
+    def train(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
         """
         Input: 
             train_data:
@@ -56,8 +56,8 @@ class HMM:
         self.O = list(words)
 
         # to do
-        self._calculate_emission_matrix()
-        self._calculate_transition_matrix()
+        self.emission_matrix = self._calculate_emission_matrix(train_data, tag_list)
+        self.transition_matrix = self._calculate_transition_matrix(train_data, tag_list)
         pass
         
 
@@ -91,7 +91,7 @@ class HMM:
     
     def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
         """
-        Calculate the emission matrix, which represents the conditional probabilities of words given tags.
+        Calculates the emission matrix, which represents the conditional probabilities of words given tags.
 
         Input: 
             train_data:
@@ -149,29 +149,67 @@ class HMM:
 
         return emission_matrix
 
-
-
-
-    def _calculate_transition_matrix(self):
+    def _calculate_transition_matrix(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
         """
-        Description: How likely is noun is followed by a verb, etc
-        Size: total tags (+1 token *) x total tags (+1 token STOP)
-                (N + 1) x (N + 1)
-                (number of rows × number of columns)
+        Calculates the transition matrix, which represents the probabilities of a specific tag given a previous tag.
+        
+        Formula: Transition_Probability(Tag2 | Tag1)
 
-            for example:
+        Input: 
+            train_data:
+                A list of pairs (word & tag).
             
-             | ADJ | ADV | VERB | NOUN | STOP
-          *  |     |     |      |      |
-         ADJ |     |     |      |      |
-         ADV |     |     |      |      |
-            ...
+            tag_list:
+                A set of all the tags.
 
-            notes:
-            - * means the start-token
-            - STOP means the end-token
+        Output: 
+            transition_matrix:
+                - Type: Dictionary
+                - Structure : {'tag2': {'tag1': transition probability} }
+                
+                For example: 
+                {
+                    'Noun': {
+                        'Noun': 0.4,
+                        'Verb': 0.3,
+                        'Adjective': 0.2,
+                    },
+                    'Verb': {
+                        'Noun': 0.1,
+                        'Verb': 0.5,
+                        'Adjective': 0.4,
+                    },
+                }
+                
+                So, Noun following as Adjective would have a probability of 0.2, 
+                >>>> transition_matrix['Noun']['Adjective']
         """
-        pass
+        # Initialize an empty dictionary to store the transition matrix
+        transition_matrix = {}
+
+        # Count occurrences of each tag in the training data
+        tag_counts = {}
+        for word, tag in train_data:
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+        # Calculate transition probabilities for each pair of tags (t1, t2)
+        for t2 in tag_list:
+            
+            # Initialize a dictionary to store transition probabilities for t2 given all possible t1 tags
+            transition_matrix[t2] = {}
+            for t1 in tag_list:
+                count_t2_t1 = 0
+
+                # Count tag transitions from t1 to t2 in the training data
+                for idx in range(len(train_data) - 1):
+                    if train_data[idx][1] == t1 and train_data[idx + 1][1] == t2:
+                        count_t2_t1 += 1
+
+                # Calculate and store the transition probability P(t2|t1)
+                transition_matrix[t2][t1] = count_t2_t1 / tag_counts[t1]
+
+        # Return the computed transition matrix
+        return transition_matrix
 
 
 
