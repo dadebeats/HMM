@@ -1,8 +1,9 @@
 from typing import List, Tuple
-
+from const import UNK_TOKEN, START_TOKEN, STOP_TOKEN
 
 """
-NOTES (TO DO): not finished designing for smoothing, phi initialization, and viterbi algorithm
+NOTES (TO DO): not finished designing for smoothing, phi initialization, and viterbi algorithm,
+    add token start & end for each sentences (in train & predict)
 ideas: what if smoothing is applied as parameter of function?
     eg. _calculate_emission_matrix(self, ..., smoothing="log")
         _calculate_emission_matrix(self, ..., smoothing=None)
@@ -11,26 +12,47 @@ class HMM:
     """
     HMM that implements Viterbi Algorithm
 
-    Attributes:
+    Attributes (in theory):
     - a set of N states Q = q1, q2, . . . , qN (represents tags)
     - a sequence of T observations O = o1, o2, . . . , oT (represents words)
     - a transition probability matrix A = a11 . . . aij . . . aNN
     - a sequence of observation likelihoods B = bi(ot)
     - an initial probability distribution over states π = π1, π2, . . . , πN
+
+    Attributes (in application):
+    - transition probability matrix has size of N + 3 (added UNK_TOKEN, START_TOKEN, END_TOKEN)
+    - initial probability distribution over states (phi) also has size of N + 3
+    - emission matrix / sequence of observation likelihoods B has size of N + 1 (added UNK_TOKEN)
     """
     def __init__(self):
-        self.init_attributes()
+        self._init_attributes()
 
-    def init_attributes(self):
+    def _init_attributes(self):
         self.N = 0 # total tags
         self.T = 0 # total words
-        self.Q: List = [] # size N
-        self.O: List = [] # size T
+        self.Q: List = [] # list tags size N
+        self.O: List = [] # list words size T
         self.transition_matrix = {} # transition_matrix
         self.emission_matrix = {} # emission_matrix
+        self.smoothing_factor = 0.001 # default value
         self.phi = [] # size N
 
-    def train(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
+    def _set_attributes(self, data: List[Tuple[str, str]]):
+        words, tags = set(), set()
+        for word, tag in data:
+            words.add(word)
+            tags.add(tag)
+        tags.add(UNK_TOKEN)
+        tags.add(START_TOKEN)
+        tags.add(STOP_TOKEN)
+        self.Q = list(tags)
+        self.O = list(words)
+        self.N = len(self.Q)
+        self.T = len(self.O)
+
+        self.phi = [self.smoothing_factor] * self.N
+
+    def train(self, train_data: List[Tuple[str, str]]):
         """
         Input: 
             train_data:
@@ -40,15 +62,13 @@ class HMM:
 
                 meaning:
                 - train_data[0] = 1st pair of word & tag
-            
-            tag_list:
-                a set of all the tags present in the data set 
         """
-        self.init_attributes()
+        self._init_attributes()
+        self._set_attributes(train_data)
 
         # Calculating both the Tranisition and Emission Matrix
-        self.emission_matrix = self._calculate_emission_matrix(train_data, tag_list)
-        self.transition_matrix = self._calculate_transition_matrix(train_data, tag_list)
+        self.emission_matrix = self._calculate_emission_matrix(train_data)
+        self.transition_matrix = self._calculate_transition_matrix(train_data)
 
     def evaluate(self, gold_data: List[List[Tuple[str, str]]]):
         """
@@ -78,16 +98,13 @@ class HMM:
     def get_emission_matrix(self):
         return self.emission_matrix
     
-    def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
+    def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]]):
         """
         Calculates the emission matrix, which represents the conditional probabilities of words given tags.
 
         Input: 
             train_data:
                 A list of pairs (word & tag).
-            
-            tag_list:
-                A set of all the tags.
 
         Output: 
             emission_matrix:
@@ -106,10 +123,20 @@ class HMM:
                             'jump': 0.4
                         }
                     }
+
+        Example Calculation of the Probability in Emission Matrix:
+            P(oi|qi) = count(VERB, 'be') / count(VERB) = 4046/13126 = 0.31
         """
+        
         tag_word_counts = {}  # Dictionary to store word counts for each tag
         tag_counts = {}  # Dictionary to store tag counts
         emission_matrix = {}  # Dictionary to store the emission matrix
+
+        # Aliasing self.Q as tag_list for readable-purpose
+        # and remove START_TOKEN & STOP_TOKEN in tag_list because emission_matrix don't need it
+        tag_list = list(self.Q)
+        tag_list.remove(START_TOKEN)
+        tag_list.remove(STOP_TOKEN)
 
         for word, tag in train_data:
             
@@ -138,7 +165,7 @@ class HMM:
 
         return emission_matrix
 
-    def _calculate_transition_matrix(self, train_data: List[Tuple[str, str]], tag_list: set[str]):
+    def _calculate_transition_matrix(self, train_data: List[Tuple[str, str]]):
         """
         Calculates the transition matrix, which represents the probabilities of a specific tag given a previous tag.
         
@@ -147,9 +174,6 @@ class HMM:
         Input: 
             train_data:
                 A list of pairs (word & tag).
-            
-            tag_list:
-                A set of all the tags.
 
         Output: 
             transition_matrix:
@@ -172,9 +196,15 @@ class HMM:
                 
                 So, Noun following as Adjective would have a probability of 0.2, 
                 >>>> transition_matrix['Noun']['Adjective']
+
+        Example Calculation of the Probability in Transition Matrix:
+            P(qi|qi−1) = count(AUX,VERB) / count(AUX) = 10471/13124 = .80
         """
         # Initialize an empty dictionary to store the transition matrix
         transition_matrix = {}
+
+        # Aliasing self.Q as tag_list for readable-purpose
+        tag_list = self.Q
 
         # Count occurrences of each tag in the training data
         tag_counts = {}
@@ -199,3 +229,15 @@ class HMM:
 
         # Return the computed transition matrix
         return transition_matrix
+
+    def _smoothing():
+        """
+        applied on emission_matrix
+        """
+        pass
+
+    def _add_start_and_stop_tokens_in_sentence():
+        pass
+
+    def _remove_start_and_stop_tokens_in_sentence():
+        pass
