@@ -23,9 +23,15 @@ class HMM:
     - an initial probability distribution over states π = π1, π2, . . . , πN
 
     Attributes (in application):
-    - transition probability matrix has size of N + 3 (added UNK_TOKEN, START_TOKEN, END_TOKEN)
-    - initial probability distribution over states (phi) also has size of N + 3
-    - emission matrix / sequence of observation likelihoods B has size of N + 1 (added UNK_TOKEN)
+    - transition probability matrix has size of 'tags found in training data' + 3 (added UNK_TOKEN, START_TOKEN, END_TOKEN)
+    - initial probability distribution over states (phi) also has size of 'tags found in training data' + 3
+    - emission matrix / sequence of observation likelihoods B has size of 'tags found in training data' + 1 (added UNK_TOKEN)
+    - use_log_prob is used if the value in emission / transition matrix is calculated using log or not.
+        probability is a decimal number, when it is not a log value and used in multiplications, it may lead to underflow
+    - apply_smoothing_in_emission_matrix is used to give smoothing to the emission matrix or not.
+        smoothing used to give unseen events a small amount of probability.
+    - self.apply_smoothing_in_transition_matrix is used to give smoothing to the transition matrix or not.
+        smoothing used to give unseen events a small amount of probability.
     """
 
     def __init__(self):
@@ -38,8 +44,13 @@ class HMM:
         self.O: List = []  # list words size T
         self.transition_matrix = {}  # transition_matrix
         self.emission_matrix = {}  # emission_matrix
-        self.smoothing_factor = 0  # default value
+        self.smoothing_factor = 0.0  # default value
         self.phi = []  # size N
+
+        # other attributes for tuning the models
+        self.use_log_prob = False
+        self.apply_smoothing_in_emission_matrix = False
+        self.apply_smoothing_in_transition_matrix = False
 
     def _set_attributes(
         self,
@@ -115,7 +126,6 @@ class HMM:
 
             smoothing_factor:
                 A number that used for smoothing.
-                Usage: give unseen events a small amount of probability
 
             apply_smoothing_in_emission_matrix:
                 A bool to determine whether smoothing process will be applied when calculating emission matrix or not
@@ -235,7 +245,11 @@ class HMM:
             for word in tag_word_counts.get(tag, {}):
                 word_count = tag_word_counts[tag][word]
                 temp_matrix[word] = self._get_probability(
-                    word_count, tag_counts[tag], self.apply_smoothing_in_emission_matrix
+                    word_count,
+                    tag_counts[tag],
+                    self.use_log_prob,
+                    self.apply_smoothing_in_emission_matrix,
+                    self.smoothing_factor,
                 )
 
             # Store the tag's emission probabilities in the emission matrix
@@ -308,7 +322,9 @@ class HMM:
                 transition_matrix[t2][t1] = self._get_probability(
                     count_t2_t1,
                     tag_counts[t1],
+                    self.use_log_prob,
                     self.apply_smoothing_in_transition_matrix,
+                    self.smoothing_factor,
                 )
 
         # Return the computed transition matrix
@@ -318,36 +334,57 @@ class HMM:
         self,
         numerator: float,
         denominator: float,
+        use_log_prob: bool,
         is_smoothing_applied: bool,
+        smoothing_factor: float,
     ):
-        if not self.use_log_prob:
+        """
+        Calculate the probability used in emission matrix / transition matrix.
+        There are options to calculate the probabilty:
+        - use log / not (param: use_log_prob)
+        - do smoothing / not (param: is_smoothing_applied)
+        -  how much the smoothing factor is used (param: smoothing_factor; only worked when is_smoothing_applied = True)
+
+        Input:
+            numerator: float
+            denominator: float
+            use_log_prob: bool
+            is_smoothing_applied: bool
+            smoothing_factor: float
+
+        Output:
+            value:
+                - Type: float
+                - Example: 0.001, 2.0, -inf
+        """
+        if not use_log_prob:
             if not is_smoothing_applied:
                 value = numerator / denominator
             else:
-                if not self.smoothing_factor:
+                if not smoothing_factor:
                     print(
                         "WARNING: Smoothing is applied but smoothing_factor is set to 0!"
                     )
-                value = (numerator + self.smoothing_factor) / (
-                    denominator + self.smoothing_factor
+                value = (numerator + smoothing_factor) / (
+                    denominator + smoothing_factor
                 )
         else:
             # rules of log: log(A/B) - log A - log B
-            if not self.is_smoothing_applied:
+            if not is_smoothing_applied:
                 # if no smoothing factor, means numerator or denominator maybe 0
                 if not numerator or not denominator:
                     # case: numerator = 0 & denominator = else, result is -inf. math lib can't operate that
                     # case: numerator = 0 & denominator = 0, result NaN. math lib can't operate that
-                    value = math.inf
+                    value = -math.inf
                 else:
                     value = math.log(numerator) - math.log(denominator)
             else:
-                if not self.smoothing_factor:
+                if not smoothing_factor:
                     print(
                         "WARNING: Smoothing is applied but smoothing_factor is set to 0!"
                     )
-                value = math.log(numerator + self.smoothing_factor) - math.log(
-                    denominator + self.smoothing_factor
+                value = math.log(numerator + smoothing_factor) - math.log(
+                    denominator + smoothing_factor
                 )
 
         return value
