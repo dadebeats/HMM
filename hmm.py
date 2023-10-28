@@ -26,8 +26,9 @@ class HMM:
         probability is a decimal number, when it is not a log value and used in multiplications, it may lead to underflow
     - apply_smoothing_in_emission_matrix is used to give smoothing to the emission matrix or not.
         smoothing used to give unseen events a small amount of probability.
-    - self.apply_smoothing_in_transition_matrix is used to give smoothing to the transition matrix or not.
+    - apply_smoothing_in_transition_matrix is used to give smoothing to the transition matrix or not.
         smoothing used to give unseen events a small amount of probability.
+    - smoothing_factor is the number for smoothing process
     """
 
     def __init__(self):
@@ -40,13 +41,14 @@ class HMM:
         self.O: List = []  # list words size T
         self.transition_matrix = {}  # transition_matrix
         self.emission_matrix = {}  # emission_matrix
-        self.smoothing_factor = 0.0  # default value
         self.phi = []  # size N
+        self.INIT_PROB_VALUE = -math.inf
 
         # other attributes for tuning the models
         self.use_log_prob = False
         self.apply_smoothing_in_emission_matrix = False
         self.apply_smoothing_in_transition_matrix = False
+        self.smoothing_factor = 0.0  # default value
 
     def _set_attributes(
         self,
@@ -90,7 +92,6 @@ class HMM:
         self.smoothing_factor = (
             smoothing_factor if smoothing_factor else self.smoothing_factor
         )
-        self.phi = [self.smoothing_factor] * self.N
 
         self.apply_smoothing_in_emission_matrix = apply_smoothing_in_emission_matrix
         self.apply_smoothing_in_transition_matrix = apply_smoothing_in_transition_matrix
@@ -109,7 +110,7 @@ class HMM:
 
         Input:
             train_data:
-                list of pairs (word & tag)
+                List of pairs (word & tag).
                 eg.
                 [('The', 'DET'), ('Fulton', 'NOUN'), ...]
 
@@ -146,22 +147,49 @@ class HMM:
         if not have_start_stop_tokens_exists:
             self._add_start_and_stop_tokens_in_sentence()
 
+        # Calculating the phi
+        self.phi = self._calculate_phi(train_data)
         # Calculating both the Tranisition and Emission Matrix
         self.emission_matrix = self._calculate_emission_matrix(train_data)
         self.transition_matrix = self._calculate_transition_matrix(train_data)
 
-    def predict(self, sent: List[str], need_start_stop_tokens_removed: bool = True):
+    def predict(
+        self, data: List[List[str]], need_start_stop_tokens_removed: bool = True
+    ):
         """
-        Input: List of words in a sentence
-        Output: List of tags
+        Predict the tags in the sentences using Viterbi Algorithm
 
-        Notes:
-        - applying Viterbi algorithm
-        - don't forget to handle the UNK token
+        Input:
+            data:
+            List of sentences which contains list of words.
+            eg.
+                [
+                    ['I', 'want', 'apple'],
+                    ['Tony', 'went', 'to', ...],
+                ]
+            need_start_stop_tokens_removed:
+                If True means the remove the START_TOKEN & STOP_TOKEN from the output tags.
+        Output: List of tags
         """
 
         if need_start_stop_tokens_removed:
             self._remove_start_and_stop_tokens_in_sentence()
+        pass
+
+    def _viterbi_algorithm():
+        """
+        Initialization Step:
+            viterbi[q, 1]   = πq ∗ bq(o1)
+                            = P(token) * P(word|token)
+        Recursive Steps:
+            viterbi[q,t]    = max viterbi[q',t − 1] ∗ A[q',q] ∗ bq(ot)
+                            = max(prev viterbi) * P(token|prev token) * P(word|token)
+
+        Notes:
+            - P(token) is from phi
+            - P(word|token) is from Emission Matrix
+            - P(token|prev token) is from Transition Matrix
+        """
         pass
 
     def get_transition_matrix(self):
@@ -169,6 +197,39 @@ class HMM:
 
     def get_emission_matrix(self):
         return self.emission_matrix
+
+    def _calculate_phi(self, train_data: List[Tuple[str, str]]):
+        """
+        Calculate the phi (probability of each token) - P(token)
+
+        Input:
+            train_data:
+                A list of pairs (word & tag).
+        """
+        phi = []  # size of N
+        all_occurences = 0
+        tag_counts = {}
+        for _, tag in train_data:
+            if tag not in tag_counts:
+                tag_counts[tag] = 0
+            tag_counts[tag] += 1
+            all_occurences += 1
+
+        for tag in self.Q:
+            numerator = tag_counts[tag]
+            denominator = all_occurences
+            value = 0
+            if not numerator or not denominator:
+                value = self.INIT_PROB_VALUE
+            else:
+                if self.use_log_prob:
+                    value = math.log(tag_counts[tag]) - math.log(all_occurences)
+                else:
+                    value = tag_counts[tag] / all_occurences
+
+            phi.append(value)
+
+        return phi
 
     def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]]):
         """
@@ -342,6 +403,14 @@ class HMM:
                 - Type: float
                 - Example: 0.001, 2.0, -inf
         """
+        value = 0
+        if not (numerator + smoothing_factor) or not (denominator + smoothing_factor):
+            # if numerator + smoothing_factor = 0
+            # or denominator + smoothing_factor = 0
+            # automatically set the probability
+            value = self.INIT_PROB_VALUE
+            return value
+
         if not use_log_prob:
             if not is_smoothing_applied:
                 value = numerator / denominator
@@ -357,12 +426,7 @@ class HMM:
             # rules of log: log(A/B) - log A - log B
             if not is_smoothing_applied:
                 # if no smoothing factor, means numerator or denominator maybe 0
-                if not numerator or not denominator:
-                    # case: numerator = 0 & denominator = else, result is -inf. math lib can't operate that
-                    # case: numerator = 0 & denominator = 0, result NaN. math lib can't operate that
-                    value = -math.inf
-                else:
-                    value = math.log(numerator) - math.log(denominator)
+                value = math.log(numerator) - math.log(denominator)
             else:
                 if not smoothing_factor:
                     print(
