@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import List, Dict, Tuple, Optional
 import math
 from const import UNK_TOKEN, START_TOKEN, STOP_TOKEN
 
@@ -186,12 +186,18 @@ class HMM:
                 If True means the remove the START_TOKEN & STOP_TOKEN from the output tags.
         Output: List of tags of each sentence
         """
+        predictions = []
+        for sent in data:
+            sent = [word.lower() for word in sent]
+            tokens = self._viterbi_algorithm(sent)
+            predictions.append(tokens)
 
         if need_start_stop_tokens_removed:
-            self._remove_start_and_stop_tokens_in_sentence()
-        pass
+            self._remove_start_and_stop_tokens_in_sentence(predictions)
 
-    def _viterbi_algorithm():
+        return predictions
+
+    def _viterbi_algorithm(self, sent: List[str]):
         """
         Initialization Step:
             viterbi[q, 1]   = πq ∗ bq(o1)
@@ -205,7 +211,75 @@ class HMM:
             - P(word|token) is from Emission Matrix
             - P(token|prev token) is from Transition Matrix
         """
-        pass
+
+        def is_unk_tag(word: str):
+            # if the word is not found in the emission_matrix, means the word is not showing up in the train_data
+            # hence, it is an unknown word - is_unk = True
+            is_unk = True
+            for tag in self.Q:
+                if word in self.emission_matrix[tag]:
+                    is_unk = False
+                    break
+            return is_unk
+
+        def get_best_token_path(probabilities: Dict[str, float]):
+            # the best probability (the maximum value) means the token/tag is the best path/option
+            best_token, best_prob = "", self.INIT_PROB_VALUE
+            for token, prob in probabilities.items():
+                if prob > best_prob:
+                    best_token = token
+                    best_prob = prob
+
+            return best_token, best_prob
+
+        selected_tags = []
+        max_prev_viterbi = 0
+        prev_tag = None
+        for idx, word in enumerate(sent):
+            if is_unk_tag(word):
+                # continue to next word
+                selected_tags.append(UNK_TOKEN)
+                continue
+
+            path_probabilities = {}
+            if idx == 0:
+                # Initialization Step
+                for tag in self.Q:
+                    # P(tag|token_start) * emission P(word|token)
+                    if word not in self.emission_matrix[tag]:
+                        prob = self.INIT_PROB_VALUE
+                    else:
+                        if self.use_log_prob:
+                            prob = self.phi[tag] + self.emission_matrix[tag][word]
+                        else:
+                            prob = self.phi[tag] * self.emission_matrix[tag][word]
+                    path_probabilities[tag] = prob
+
+            else:
+                # Recursive Steps
+                for tag in self.Q:
+                    transition_value = (
+                        0
+                        if prev_tag == UNK_TOKEN
+                        else self.transition_matrix[tag][prev_tag]
+                    )
+                    emission_value = self.emission_matrix[tag][word]
+                    if self.use_log_prob:
+                        prob = max_prev_viterbi + transition_value + emission_value
+                    else:
+                        prob = max_prev_viterbi * transition_value * emission_value
+                    path_probabilities[tag] = prob
+
+            best_token, best_prob = get_best_token_path(path_probabilities)
+            if not best_token:
+                # all of the calculation resulting -inf, meaning there is no best option
+                best_token = UNK_TOKEN
+            
+            selected_tags.append(best_token)
+            prev_tag = best_token
+            max_prev_viterbi = 0 if best_prob == self.INIT_PROB_VALUE else best_prob
+
+        return selected_tags
 
     def _calculate_phi(self, train_data: List[List[Tuple[str, str]]]):
         """
