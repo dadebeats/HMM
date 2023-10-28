@@ -150,17 +150,6 @@ class HMM:
         self.emission_matrix = self._calculate_emission_matrix(train_data)
         self.transition_matrix = self._calculate_transition_matrix(train_data)
 
-    def evaluate(self, gold_data: List[List[Tuple[str, str]]]):
-        """
-        Input: list of pairs (word & tag) for each sentence
-            read the train function's input for further explanation
-
-        Task:
-            - strip the tags from the gold data, retag it using this HMM tagger (use predict function)
-            - show / return the evaluation score (eg. accuracy)
-        """
-        pass
-
     def predict(self, sent: List[str], need_start_stop_tokens_removed: bool = True):
         """
         Input: List of words in a sentence
