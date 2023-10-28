@@ -19,16 +19,26 @@ class HMM:
     - an initial probability distribution over states π = π1, π2, . . . , πN
 
     Attributes (in application):
-    - transition probability matrix has size of 'tags found in training data' + 3 (added UNK_TOKEN, START_TOKEN, END_TOKEN)
-    - initial probability distribution over states (phi) also has size of 'tags found in training data' + 3
-    - emission matrix / sequence of observation likelihoods B has size of 'tags found in training data' + 1 (added UNK_TOKEN)
-    - use_log_prob is used if the value in emission / transition matrix is calculated using log or not.
-        probability is a decimal number, when it is not a log value and used in multiplications, it may lead to underflow
-    - apply_smoothing_in_emission_matrix is used to give smoothing to the emission matrix or not.
+    - transition_matrix:
+        represent A (transition probability matrix). use type dictionary
+    - emission_matrix:
+        represent B (sequence of observation likelihoods). use type dictionary
+    - phi:
+        use type dictionary
+    - use_log_prob:
+        when True, then the value in emission / transition matrix is calculated using log.
+        why? probability is a decimal number, when it is not a log value and used in multiplications, it may lead to underflow
+    - apply_smoothing_in_emission_matrix:
+        when True, then smoothing will be applied in the emission matrix.
         smoothing used to give unseen events a small amount of probability.
-    - apply_smoothing_in_transition_matrix is used to give smoothing to the transition matrix or not.
+    - apply_smoothing_in_transition_matrix:
+        when True, then smoothing will be applied in the transition matrix.
         smoothing used to give unseen events a small amount of probability.
-    - smoothing_factor is the number for smoothing process
+    - smoothing_factor:
+        is the number for smoothing process
+
+    Notes:
+        in this HMM class, we use additional tokens (START_TOKEN, STOP_TOKEN, UNK_TOKEN)
     """
 
     def __init__(self):
@@ -52,7 +62,7 @@ class HMM:
 
     def _set_attributes(
         self,
-        data: List[Tuple[str, str]],
+        data: List[List[Tuple[str, str]]],
         use_log_prob: bool,
         smoothing_factor: Optional[float],
         apply_smoothing_in_emission_matrix: bool,
@@ -73,9 +83,10 @@ class HMM:
             (for further description can be read at the train func)
         """
         words, tags = set(), set()
-        for word, tag in data:
-            words.add(word)
-            tags.add(tag)
+        for sent in data:
+            for word, tag in sent:
+                words.add(word)
+                tags.add(tag)
 
         if UNK_TOKEN not in tags:
             tags.add(UNK_TOKEN)
@@ -98,7 +109,7 @@ class HMM:
 
     def train(
         self,
-        train_data: List[Tuple[str, str]],
+        train_data: List[List[Tuple[str, str]]],
         use_log_prob: bool = False,
         smoothing_factor: Optional[float] = None,
         apply_smoothing_in_emission_matrix: bool = False,
@@ -110,12 +121,15 @@ class HMM:
 
         Input:
             train_data:
-                List of pairs (word & tag).
+                A list of pairs (word & tag) for each sentence.
                 eg.
-                [('The', 'DET'), ('Fulton', 'NOUN'), ...]
+                [[('The', 'DET'), ('Fulton', 'NOUN'), ...],
+                [],
+                []]
 
                 meaning:
-                - train_data[0] = 1st pair of word & tag
+                - train_data[0] = List of pairs in the 1st sentence
+                - train_data[0][0] = 1st pair of word & tag of the 1st sentence
 
             use_log_prob:
                 A bool to determine whether we want the value of probability is logged or not.
@@ -161,15 +175,16 @@ class HMM:
 
         Input:
             data:
-            List of sentences which contains list of words.
+            A list of sentences which contains list of words.
             eg.
                 [
                     ['I', 'want', 'apple'],
                     ['Tony', 'went', 'to', ...],
                 ]
+
             need_start_stop_tokens_removed:
                 If True means the remove the START_TOKEN & STOP_TOKEN from the output tags.
-        Output: List of tags
+        Output: List of tags of each sentence
         """
 
         if need_start_stop_tokens_removed:
@@ -191,12 +206,6 @@ class HMM:
             - P(token|prev token) is from Transition Matrix
         """
         pass
-
-    def get_transition_matrix(self):
-        return self.transition_matrix
-
-    def get_emission_matrix(self):
-        return self.emission_matrix
 
     def _calculate_phi(self, train_data: List[List[Tuple[str, str]]]):
         """
