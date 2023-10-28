@@ -46,13 +46,20 @@ class HMM:
         data: List[Tuple[str, str]],
         use_log_prob: bool,
         smoothing_factor: Optional[float],
+        apply_smoothing_in_emission_matrix: bool,
+        apply_smoothing_in_transition_matrix: bool,
     ):
         """
         Set the attributes of the HMM based on the given data.
 
         Input:
-            data: usually is the train data
-            use_log_prob & smoothing_factor: both is used for calculating the probability
+            data:
+                usually is the train data
+            use_log_prob & smoothing_factor:
+                both is used for calculating the probability
+            apply_smoothing_in_emission_matrix & apply_smoothing_in_transition_matrix:
+                both is used for smoothing, if set True then the smoothing will be applied
+                when calculating the probability in the matrix
 
             (for further description can be read at the train func)
         """
@@ -78,11 +85,16 @@ class HMM:
         )
         self.phi = [self.smoothing_factor] * self.N
 
+        self.apply_smoothing_in_emission_matrix = apply_smoothing_in_emission_matrix
+        self.apply_smoothing_in_transition_matrix = apply_smoothing_in_transition_matrix
+
     def train(
         self,
         train_data: List[Tuple[str, str]],
         use_log_prob: bool = False,
         smoothing_factor: Optional[float] = None,
+        apply_smoothing_in_emission_matrix: bool = False,
+        apply_smoothing_in_transition_matrix: bool = False,
         have_start_stop_tokens_exists: bool = False,
     ):
         """
@@ -105,13 +117,25 @@ class HMM:
                 A number that used for smoothing.
                 Usage: give unseen events a small amount of probability
 
+            apply_smoothing_in_emission_matrix:
+                A bool to determine whether smoothing process will be applied when calculating emission matrix or not
+
+            apply_smoothing_in_transition_matrix:
+                A bool to determine whether smoothing process will be applied when calculating transition matrix or not
+
             have_start_stop_tokens_exists:
                 If True means the sentence in train_data already has START_TOKEN at the beginning of the sentence
                     and STOP_TOKEN at the end.
                 Else means we need to insert these tokens
         """
         self._init_attributes()
-        self._set_attributes(train_data, use_log_prob, smoothing_factor)
+        self._set_attributes(
+            train_data,
+            use_log_prob,
+            smoothing_factor,
+            apply_smoothing_in_emission_matrix,
+            apply_smoothing_in_transition_matrix,
+        )
 
         if not have_start_stop_tokens_exists:
             self._add_start_and_stop_tokens_in_sentence()
@@ -210,7 +234,9 @@ class HMM:
 
             for word in tag_word_counts.get(tag, {}):
                 word_count = tag_word_counts[tag][word]
-                temp_matrix[word] = self._get_probability(word_count, tag_counts[tag])
+                temp_matrix[word] = self._get_probability(
+                    word_count, tag_counts[tag], self.apply_smoothing_in_emission_matrix
+                )
 
             # Store the tag's emission probabilities in the emission matrix
             emission_matrix[tag] = temp_matrix
@@ -280,7 +306,9 @@ class HMM:
 
                 # Calculate and store the transition probability P(t2|t1)
                 transition_matrix[t2][t1] = self._get_probability(
-                    count_t2_t1, tag_counts[t1]
+                    count_t2_t1,
+                    tag_counts[t1],
+                    self.apply_smoothing_in_transition_matrix,
                 )
 
         # Return the computed transition matrix
@@ -290,17 +318,22 @@ class HMM:
         self,
         numerator: float,
         denominator: float,
+        is_smoothing_applied: bool,
     ):
         if not self.use_log_prob:
-            if not self.smoothing_factor:
+            if not is_smoothing_applied:
                 value = numerator / denominator
             else:
+                if not self.smoothing_factor:
+                    print(
+                        "WARNING: Smoothing is applied but smoothing_factor is set to 0!"
+                    )
                 value = (numerator + self.smoothing_factor) / (
                     denominator + self.smoothing_factor
                 )
         else:
             # rules of log: log(A/B) - log A - log B
-            if not self.smoothing_factor:
+            if not self.is_smoothing_applied:
                 # if no smoothing factor, means numerator or denominator maybe 0
                 if not numerator or not denominator:
                     # case: numerator = 0 & denominator = else, result is -inf. math lib can't operate that
@@ -309,6 +342,10 @@ class HMM:
                 else:
                     value = math.log(numerator) - math.log(denominator)
             else:
+                if not self.smoothing_factor:
+                    print(
+                        "WARNING: Smoothing is applied but smoothing_factor is set to 0!"
+                    )
                 value = math.log(numerator + self.smoothing_factor) - math.log(
                     denominator + self.smoothing_factor
                 )
