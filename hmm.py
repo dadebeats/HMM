@@ -3,11 +3,7 @@ import math
 from const import UNK_TOKEN, START_TOKEN, STOP_TOKEN
 
 """
-NOTES (TO DO): not finished designing for smoothing, phi initialization, and viterbi algorithm,
-    add token start & end for each sentences (in train & predict)
-ideas: what if smoothing is applied as parameter of function?
-    eg. _calculate_emission_matrix(self, ..., smoothing="log")
-        _calculate_emission_matrix(self, ..., smoothing=None)
+NOTES (TO DO): not finished viterbi algorithm and add token start & end for each sentences (in train & predict)
 """
 
 
