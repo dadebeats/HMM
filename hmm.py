@@ -39,9 +39,9 @@ class HMM:
         self.T = 0  # total words
         self.Q: List = []  # list tags size N
         self.O: List = []  # list words size T
-        self.transition_matrix = {}  # transition_matrix
-        self.emission_matrix = {}  # emission_matrix
-        self.phi = []  # size N
+        self.transition_matrix = {}  # transition_matrix (or A)
+        self.emission_matrix = {}  # emission_matrix (or B)
+        self.phi = {}  # initial probability distribution
         self.INIT_PROB_VALUE = -math.inf
 
         # other attributes for tuning the models
@@ -198,42 +198,73 @@ class HMM:
     def get_emission_matrix(self):
         return self.emission_matrix
 
-    def _calculate_phi(self, train_data: List[Tuple[str, str]]):
+    def _calculate_phi(self, train_data: List[List[Tuple[str, str]]]):
         """
-        Calculate the phi (probability of each token) - P(token)
+        Calculate the phi (probability of each token in initial state) - P(token | START_TOKEN)
+
+        Formula:
+            P(token | START_TOKEN)
+
+        Example:
+            phi-token = P(token| START_TOKEN) = count(START_TOKEN, token) / count(START_TOKEN)
 
         Input:
             train_data:
-                A list of pairs (word & tag).
-        """
-        phi = []  # size of N
-        all_occurences = 0
-        tag_counts = {}
-        for _, tag in train_data:
-            if tag not in tag_counts:
-                tag_counts[tag] = 0
-            tag_counts[tag] += 1
-            all_occurences += 1
+                A list of pairs (word & tag) for each sentence.
 
+        Output:
+            phi:
+                - Type: Dictionary
+                - Structure : {'VERB': 0.001 }
+        """
+        phi = {}
+        total_start_tokens = 0
+        tag_start_counts = (
+            {}
+        )  # save total occurence of a tag with previous token is START_TOKEN
+        for sent in train_data:
+            if len(sent) > 1:
+                try:
+                    sent[0] == START_TOKEN
+                except Exception as e:
+                    raise Exception(
+                        "Wrong format, each sentence must initialized with START_TOKEN"
+                    ) from e
+
+                token = sent[1]
+                total_start_tokens += 1
+                if token not in tag_start_counts:
+                    tag_start_counts[token] = 0
+                tag_start_counts[token] += 1
+
+        denominator = total_start_tokens
         for tag in self.Q:
-            numerator = tag_counts[tag]
-            denominator = all_occurences
-            value = 0
-            if not numerator or not denominator:
+            if tag == START_TOKEN:
+                # it's impossible if START_TOKEN followed by START_TOKEN
+                continue
+            if tag not in tag_start_counts:
+                # tag is not found in training data
                 value = self.INIT_PROB_VALUE
             else:
-                if self.use_log_prob:
-                    value = math.log(tag_counts[tag]) - math.log(all_occurences)
-                else:
-                    value = tag_counts[tag] / all_occurences
+                numerator = tag_start_counts[tag]
+                value = self._get_probability(
+                    numerator,
+                    denominator,
+                    self.use_log_prob,
+                    self.apply_smoothing_in_transition_matrix,
+                    self.smoothing_factor,
+                )
 
-            phi.append(value)
+            phi[tag] = value
 
         return phi
 
     def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]]):
         """
         Calculates the emission matrix, which represents the conditional probabilities of words given tags.
+
+        Example Calculation of the Probability in Emission Matrix:
+            P(oi|qi) = count(VERB, 'be') / count(VERB) = 4046/13126 = 0.31
 
         Input:
             train_data:
@@ -256,9 +287,6 @@ class HMM:
                             'jump': 0.4
                         }
                     }
-
-        Example Calculation of the Probability in Emission Matrix:
-            P(oi|qi) = count(VERB, 'be') / count(VERB) = 4046/13126 = 0.31
         """
 
         tag_word_counts = {}  # Dictionary to store word counts for each tag
@@ -266,10 +294,7 @@ class HMM:
         emission_matrix = {}  # Dictionary to store the emission matrix
 
         # Aliasing self.Q as tag_list for readable-purpose
-        # and remove START_TOKEN & STOP_TOKEN in tag_list because emission_matrix don't need it
-        tag_list = list(self.Q)
-        tag_list.remove(START_TOKEN)
-        tag_list.remove(STOP_TOKEN)
+        tag_list = self.Q
 
         for word, tag in train_data:
             # Normalize word by converting it to lowercase
@@ -303,14 +328,14 @@ class HMM:
 
         return emission_matrix
 
-    def _calculate_transition_matrix(
-        self,
-        train_data: List[Tuple[str, str]],
-    ):
+    def _calculate_transition_matrix(self, train_data: List[Tuple[str, str]]):
         """
         Calculates the transition matrix, which represents the probabilities of a specific tag given a previous tag.
 
         Formula: Transition_Probability(Tag2 | Tag1)
+
+        Example Calculation of the Probability in Transition Matrix:
+            P(qi|qi−1) = count(AUX,VERB) / count(AUX) = 10471/13124 = 0.80
 
         Input:
             train_data:
@@ -337,9 +362,6 @@ class HMM:
 
                 So, Noun following as Adjective would have a probability of 0.2,
                 >>>> transition_matrix['Noun']['Adjective']
-
-        Example Calculation of the Probability in Transition Matrix:
-            P(qi|qi−1) = count(AUX,VERB) / count(AUX) = 10471/13124 = .80
         """
         # Initialize an empty dictionary to store the transition matrix
         transition_matrix = {}
@@ -357,6 +379,10 @@ class HMM:
             # Initialize a dictionary to store transition probabilities for t2 given all possible t1 tags
             transition_matrix[t2] = {}
             for t1 in tag_list:
+                if t1 == START_TOKEN:
+                    # skip because will be handled & saved in the phi attribute
+                    continue
+
                 count_t2_t1 = 0
 
                 # Count tag transitions from t1 to t2 in the training data
