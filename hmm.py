@@ -351,17 +351,19 @@ class HMM:
         for sent in train_data:
             if len(sent) > 1:
                 try:
-                    sent[0] == START_TOKEN
+                    # sentence is List of word, tag
+                    # means, sent[0][0] should be START_TOKEN
+                    sent[0][0] == START_TOKEN
                 except Exception as e:
                     raise Exception(
                         "Wrong format, each sentence must initialized with START_TOKEN"
                     ) from e
 
-                token = sent[1]
-                total_start_tokens += 1
-                if token not in tag_start_counts:
-                    tag_start_counts[token] = 0
-                tag_start_counts[token] += 1
+                for _, token in sent:
+                    total_start_tokens += 1
+                    if token not in tag_start_counts:
+                        tag_start_counts[token] = 0
+                    tag_start_counts[token] += 1
 
         denominator = total_start_tokens
         for tag in self.Q:
@@ -516,9 +518,10 @@ class HMM:
                 count_t2_t1 = 0
 
                 # Count tag transitions from t1 to t2 in the training data
-                for idx in range(len(train_data) - 1):
-                    if train_data[idx][1] == t1 and train_data[idx + 1][1] == t2:
-                        count_t2_t1 += 1
+                for sentence_data in train_data:
+                    for idx in range(len(sentence_data) - 1):
+                        if sentence_data[idx][1] == t1 and sentence_data[idx + 1][1] == t2:
+                            count_t2_t1 += 1
 
                 # Calculate and store the transition probability P(t2|t1)
                 transition_matrix[t2][t1] = self._get_probability(
