@@ -114,7 +114,6 @@ class HMM:
         smoothing_factor: Optional[float] = None,
         apply_smoothing_in_emission_matrix: bool = False,
         apply_smoothing_in_transition_matrix: bool = False,
-        have_start_stop_tokens_exists: bool = False,
     ):
         """
         Train the HMM model based on the given data.
@@ -158,8 +157,9 @@ class HMM:
             apply_smoothing_in_transition_matrix,
         )
 
-        if not have_start_stop_tokens_exists:
-            self._add_start_and_stop_tokens_in_sentence()
+        train_data = [
+            self._add_start_and_stop_tokens_in_sentence(p) for p in train_data
+        ]
 
         # Calculating the phi
         self.phi = self._calculate_phi(train_data)
@@ -167,9 +167,7 @@ class HMM:
         self.emission_matrix = self._calculate_emission_matrix(train_data)
         self.transition_matrix = self._calculate_transition_matrix(train_data)
 
-    def predict(
-        self, data: List[List[str]], need_start_stop_tokens_removed: bool = True
-    ):
+    def predict(self, data: List[List[str]]):
         """
         Predict the tags in the sentences using Viterbi Algorithm
 
@@ -192,8 +190,9 @@ class HMM:
             tokens = self._viterbi_algorithm(sent)
             predictions.append(tokens)
 
-        if need_start_stop_tokens_removed:
-            self._remove_start_and_stop_tokens_in_sentence(predictions)
+        predictions = [
+            self._remove_start_and_stop_tokens_in_prediction(p) for p in predictions
+        ]
 
         return predictions
 
@@ -274,7 +273,7 @@ class HMM:
             if not best_token:
                 # all of the calculation resulting -inf, meaning there is no best option
                 best_token = UNK_TOKEN
-            
+
             selected_tags.append(best_token)
             prev_tag = best_token
             max_prev_viterbi = 0 if best_prob == self.INIT_PROB_VALUE else best_prob
@@ -547,8 +546,25 @@ class HMM:
 
         return value
 
-    def _add_start_and_stop_tokens_in_sentence():
+    def _add_start_and_stop_tokens_in_sentence(sent: List[str, str]):
+        """
+        Input:
+            sent:
+                A list of pairs (word & tag).
+
+        Output:
+            [(START_TOKEN, START_TOKEN)] + sent + [(STOP_TOKEN, STOP_TOKEN)]
+        """
         pass
 
-    def _remove_start_and_stop_tokens_in_sentence():
+    def _remove_start_and_stop_tokens_in_prediction(tags: List[str]):
+        """
+        Input:
+            tags:
+                A list of predicted tags.
+
+        Task:
+            - if tags[0] == START_TOKEN -> remove
+            - if tags[-1] == END_TOKEN -> remove
+        """
         pass
