@@ -3,7 +3,10 @@ import math
 from const import UNK_TOKEN, START_TOKEN, STOP_TOKEN
 
 """
-NOTES (TO DO): not finished viterbi algorithm and add token start & end for each sentences (in train & predict)
+NOTES (TO DO):
+- add token start & end for each sentences (in train & predict)
+- test the codes (check whether total words & tags equal)
+- check the correctness of these algorithm
 """
 
 
