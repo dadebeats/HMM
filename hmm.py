@@ -1,6 +1,11 @@
 from typing import List, Dict, Tuple, Optional
 import math
-from const import UNK_TOKEN, START_TOKEN, STOP_TOKEN
+
+
+UNK_TOKEN = "UNK"
+START_TOKEN = "*"
+STOP_TOKEN = "STOP"
+
 
 """
 NOTES (TO DO):
@@ -117,7 +122,7 @@ class HMM:
         smoothing_factor: Optional[float] = None,
         apply_smoothing_in_emission_matrix: bool = False,
         apply_smoothing_in_transition_matrix: bool = False,
-    ):
+        ):
         """
         Train the HMM model based on the given data.
 
@@ -166,6 +171,7 @@ class HMM:
 
         # Calculating the phi
         self.phi = self._calculate_phi(train_data)
+        
         # Calculating both the Tranisition and Emission Matrix
         self.emission_matrix = self._calculate_emission_matrix(train_data)
         self.transition_matrix = self._calculate_transition_matrix(train_data)
@@ -193,11 +199,14 @@ class HMM:
             tokens = self._viterbi_algorithm(sent)
             predictions.append(tokens)
 
-        predictions = [
-            self._remove_start_and_stop_tokens_in_prediction(p) for p in predictions
-        ]
+        # predictions = [
+        #     self._remove_start_and_stop_tokens_in_prediction(p) for p in predictions
+        # ]
 
         return predictions
+    
+    def accuracy(self, data: List[List[Tuple[str, str]]]):
+        pass
 
     def _viterbi_algorithm(self, sent: List[str]):
         """
@@ -354,7 +363,7 @@ class HMM:
 
         return phi
 
-    def _calculate_emission_matrix(self, train_data: List[Tuple[str, str]]):
+    def _calculate_emission_matrix(self, train_data: List[List[Tuple[str, str]]]):
         """
         Calculates the emission matrix, which represents the conditional probabilities of words given tags.
 
@@ -363,7 +372,7 @@ class HMM:
 
         Input:
             train_data:
-                A list of pairs (word & tag).
+                A list sentences consisting of a list of pairs (word & tag).
 
         Output:
             emission_matrix:
@@ -391,19 +400,21 @@ class HMM:
         # Aliasing self.Q as tag_list for readable-purpose
         tag_list = self.Q
 
-        for word, tag in train_data:
-            # Normalize word by converting it to lowercase
-            word = word.lower()
+        for sentence_data in train_data:
+        
+            for word, tag in sentence_data:
+                # Normalize word by converting it to lowercase
+                word = word.lower()
 
-            if tag in tag_word_counts:
-                # If the tag exists in tag_word_counts, update word count
-                tag_word_counts[tag][word] = tag_word_counts[tag].get(word, 0) + 1
-            else:
-                # If the tag is encountered for the first time, create a new entry
-                tag_word_counts[tag] = {word: 1}
+                if tag in tag_word_counts:
+                    # If the tag exists in tag_word_counts, update word count
+                    tag_word_counts[tag][word] = tag_word_counts[tag].get(word, 0) + 1
+                else:
+                    # If the tag is encountered for the first time, create a new entry
+                    tag_word_counts[tag] = {word: 1}
 
-            # Update the tag count
-            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                # Update the tag count
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
 
         for tag in tag_list:
             temp_matrix = {}  # Dictionary for the current tag
@@ -423,7 +434,7 @@ class HMM:
 
         return emission_matrix
 
-    def _calculate_transition_matrix(self, train_data: List[Tuple[str, str]]):
+    def _calculate_transition_matrix(self, train_data: List[List[Tuple[str, str]]]):
         """
         Calculates the transition matrix, which represents the probabilities of a specific tag given a previous tag.
 
@@ -434,7 +445,7 @@ class HMM:
 
         Input:
             train_data:
-                A list of pairs (word & tag).
+                A list sentences consisting of pairs (word & tag).
 
         Output:
             transition_matrix:
@@ -463,11 +474,13 @@ class HMM:
 
         # Aliasing self.Q as tag_list for readable-purpose
         tag_list = self.Q
+        # tag_list.remove('UNK')
 
         # Count occurrences of each tag in the training data
-        tag_counts = {}
-        for word, tag in train_data:
-            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        tag_counts = {'UNK':0}
+        for sentence_data in train_data:
+            for word, tag in sentence_data:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
 
         # Calculate transition probabilities for each pair of tags (t1, t2)
         for t2 in tag_list:
@@ -559,7 +572,7 @@ class HMM:
 
         return value
 
-    def _add_start_and_stop_tokens_in_sentence(sent: List[str, str]):
+    def _add_start_and_stop_tokens_in_sentence(self, sent: List[Tuple[str, str]]):
         """
         Input:
             sent:
@@ -567,10 +580,13 @@ class HMM:
 
         Output:
             [(START_TOKEN, START_TOKEN)] + sent + [(STOP_TOKEN, STOP_TOKEN)]
+            e.g
+                [('<start>', 'START')]+sent+[('<stop>','STOP')]
         """
-        pass
+        
+        return [(START_TOKEN, START_TOKEN)]+sent+[(STOP_TOKEN, STOP_TOKEN)]
 
-    def _remove_start_and_stop_tokens_in_prediction(tags: List[str]):
+    def _remove_start_and_stop_tokens_in_prediction(self, tags: List[str]):
         """
         Input:
             tags:
@@ -581,3 +597,9 @@ class HMM:
             - if tags[-1] == END_TOKEN -> remove
         """
         pass
+
+    def get_transition_matrix(self):
+        return self.transition_matrix
+    
+    def get_emission_matrix(self):
+        return self.emission_matrix
