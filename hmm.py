@@ -3,16 +3,8 @@ import math
 
 
 UNK_TOKEN = "UNK"
-START_TOKEN = "*"
+START_TOKEN = "START"
 STOP_TOKEN = "STOP"
-
-
-"""
-NOTES (TO DO):
-- add token start & end for each sentences (in train & predict)
-- test the codes (check whether total words & tags equal)
-- check the correctness of these algorithm
-"""
 
 
 class HMM:
@@ -233,15 +225,28 @@ class HMM:
                     break
             return is_unk
 
-        def get_best_token(probabilities: Dict[str, float]):
-            # the best probability (the maximum value) means the token/tag is the best path/option
-            best_token, best_prob = "", self.INIT_PROB_VALUE
+        def get_best_tokens(probabilities: Dict[str, float]):
+            """
+            The best probability (the maximum value) means the token/tag is the best path/option
+            
+            Output:
+                best_tokens (multiple tokens): List[str]
+                    Multiple tokens may be generated as the probability values for each token can be identical to one another.
+                    eg. When calculating using non-log, most of the probability will likely be 0.
+            """
+            best_tokens, best_prob = [], self.INIT_PROB_VALUE
             for token, prob in probabilities.items():
+                if prob == math.inf or prob == -math.inf:
+                    # example case of math.inf:
+                    # when calculating using non-log, and emission (-inf) * transition (-inf) resulting inf
+                    continue
                 if prob > best_prob:
-                    best_token = token
+                    best_tokens = [token]
                     best_prob = prob
+                elif prob == best_prob:
+                    best_tokens.append(token)
 
-            return best_token, best_prob
+            return best_tokens, best_prob
 
         bestpath_tags = []
         max_prev_viterbi = 0
@@ -276,21 +281,38 @@ class HMM:
                 # Recursive Steps
                 for tag in self.Q:
                     # max(prev viterbi) * P(token|prev token) * P(word|token)
-                    transition_value = (
-                        0
-                        if backpointer_tag == UNK_TOKEN
-                        else self.transition_matrix[tag][backpointer_tag]
-                    )
-                    emission_value = (
-                        self.emission_matrix[tag][word] if tag != STOP_TOKEN else 0
-                    )
+                    if backpointer_tag == UNK_TOKEN:
+                        transition_value = 0
+                    else:
+                        # when there is a tag given backpointer_tag that never shown up in the train_data
+                        # it is set to -inf
+                        transition_value = (
+                            self.INIT_PROB_VALUE
+                            if backpointer_tag not in self.transition_matrix[tag]
+                            else self.transition_matrix[tag][backpointer_tag]
+                        )
+                    if word not in self.emission_matrix[tag]:
+                        # the word is seen in the train_data, but we never got the word with given tag
+                        # hence, it is set to -inf
+                        emission_value = self.INIT_PROB_VALUE
+                    else:
+                        emission_value = (
+                            self.emission_matrix[tag][word] if tag != STOP_TOKEN else 0
+                        )
+
                     if self.use_log_prob:
                         prob = max_prev_viterbi + transition_value + emission_value
                     else:
                         prob = max_prev_viterbi * transition_value * emission_value
                     path_probabilities[tag] = prob
 
-            best_token, best_prob = get_best_token(path_probabilities)
+            best_tokens, best_prob = get_best_tokens(path_probabilities)
+            if len(best_tokens) > 1:
+                print(
+                    "WARNING: Multiple possibilities of tags found for word '" + word + "' with probabilites of " + str(best_prob) + ": " + str(best_tokens)
+                )
+                print("-- automatically select first possible tag: " + best_tokens[0])
+            best_token = best_tokens[0]
             if not best_token:
                 # all of the calculation resulting -inf, meaning there is no best option
                 best_token = UNK_TOKEN
