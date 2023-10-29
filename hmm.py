@@ -114,7 +114,7 @@ class HMM:
         smoothing_factor: Optional[float] = None,
         apply_smoothing_in_emission_matrix: bool = False,
         apply_smoothing_in_transition_matrix: bool = False,
-        ):
+    ):
         """
         Train the HMM model based on the given data.
 
@@ -163,7 +163,7 @@ class HMM:
 
         # Calculating the phi
         self.phi = self._calculate_phi(train_data)
-        
+
         # Calculating both the Tranisition and Emission Matrix
         self.emission_matrix = self._calculate_emission_matrix(train_data)
         self.transition_matrix = self._calculate_transition_matrix(train_data)
@@ -196,7 +196,7 @@ class HMM:
         # ]
 
         return predictions
-    
+
     def accuracy(self, data: List[List[Tuple[str, str]]]):
         pass
 
@@ -228,7 +228,7 @@ class HMM:
         def get_best_tokens(probabilities: Dict[str, float]):
             """
             The best probability (the maximum value) means the token/tag is the best path/option
-            
+
             Output:
                 best_tokens (multiple tokens): List[str]
                     Multiple tokens may be generated as the probability values for each token can be identical to one another.
@@ -309,7 +309,12 @@ class HMM:
             best_tokens, best_prob = get_best_tokens(path_probabilities)
             if len(best_tokens) > 1:
                 print(
-                    "WARNING: Multiple possibilities of tags found for word '" + word + "' with probabilites of " + str(best_prob) + ": " + str(best_tokens)
+                    "WARNING: Multiple possibilities of tags found for word '"
+                    + word
+                    + "' with probabilites of "
+                    + str(best_prob)
+                    + ": "
+                    + str(best_tokens)
                 )
                 print("-- automatically select first possible tag: " + best_tokens[0])
             best_token = best_tokens[0]
@@ -425,7 +430,6 @@ class HMM:
         tag_list = self.Q
 
         for sentence_data in train_data:
-        
             for word, tag in sentence_data:
                 # Normalize word by converting it to lowercase
                 word = word.lower()
@@ -501,7 +505,7 @@ class HMM:
         # tag_list.remove('UNK')
 
         # Count occurrences of each tag in the training data
-        tag_counts = {'UNK':0}
+        tag_counts = {"UNK": 0}
         for sentence_data in train_data:
             for word, tag in sentence_data:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
@@ -520,7 +524,10 @@ class HMM:
                 # Count tag transitions from t1 to t2 in the training data
                 for sentence_data in train_data:
                     for idx in range(len(sentence_data) - 1):
-                        if sentence_data[idx][1] == t1 and sentence_data[idx + 1][1] == t2:
+                        if (
+                            sentence_data[idx][1] == t1
+                            and sentence_data[idx + 1][1] == t2
+                        ):
                             count_t2_t1 += 1
 
                 # Calculate and store the transition probability P(t2|t1)
@@ -608,8 +615,8 @@ class HMM:
             e.g
                 [('<start>', 'START')]+sent+[('<stop>','STOP')]
         """
-        
-        return [(START_TOKEN, START_TOKEN)]+sent+[(STOP_TOKEN, STOP_TOKEN)]
+
+        return [(START_TOKEN, START_TOKEN)] + sent + [(STOP_TOKEN, STOP_TOKEN)]
 
     def _remove_start_and_stop_tokens_in_prediction(self, tags: List[str]):
         """
@@ -625,6 +632,6 @@ class HMM:
 
     def get_transition_matrix(self):
         return self.transition_matrix
-    
+
     def get_emission_matrix(self):
         return self.emission_matrix
