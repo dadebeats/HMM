@@ -221,7 +221,7 @@ class HMM:
                     break
             return is_unk
 
-        def get_best_token_path(probabilities: Dict[str, float]):
+        def get_best_token(probabilities: Dict[str, float]):
             # the best probability (the maximum value) means the token/tag is the best path/option
             best_token, best_prob = "", self.INIT_PROB_VALUE
             for token, prob in probabilities.items():
@@ -231,13 +231,17 @@ class HMM:
 
             return best_token, best_prob
 
-        selected_tags = []
+        bestpath_tags = []
         max_prev_viterbi = 0
-        prev_tag = None
+        backpointer_tag = None
+        current_tag = None
         for idx, word in enumerate(sent):
             if is_unk_tag(word):
                 # continue to next word
-                selected_tags.append(UNK_TOKEN)
+                current_tag = UNK_TOKEN
+                bestpath_tags.append(current_tag)
+                backpointer_tag = current_tag
+                max_prev_viterbi = 0
                 continue
 
             path_probabilities = {}
@@ -254,31 +258,37 @@ class HMM:
                             prob = self.phi[tag] * self.emission_matrix[tag][word]
                     path_probabilities[tag] = prob
 
+                backpointer_tag = START_TOKEN
+
             else:
                 # Recursive Steps
                 for tag in self.Q:
+                    # max(prev viterbi) * P(token|prev token) * P(word|token)
                     transition_value = (
                         0
-                        if prev_tag == UNK_TOKEN
-                        else self.transition_matrix[tag][prev_tag]
+                        if backpointer_tag == UNK_TOKEN
+                        else self.transition_matrix[tag][backpointer_tag]
                     )
-                    emission_value = self.emission_matrix[tag][word]
+                    emission_value = (
+                        self.emission_matrix[tag][word] if tag != STOP_TOKEN else 0
+                    )
                     if self.use_log_prob:
                         prob = max_prev_viterbi + transition_value + emission_value
                     else:
                         prob = max_prev_viterbi * transition_value * emission_value
                     path_probabilities[tag] = prob
 
-            best_token, best_prob = get_best_token_path(path_probabilities)
+            best_token, best_prob = get_best_token(path_probabilities)
             if not best_token:
                 # all of the calculation resulting -inf, meaning there is no best option
                 best_token = UNK_TOKEN
 
-            selected_tags.append(best_token)
-            prev_tag = best_token
+            current_tag = best_token
+            bestpath_tags.append(current_tag)
+            backpointer_tag = current_tag
             max_prev_viterbi = 0 if best_prob == self.INIT_PROB_VALUE else best_prob
 
-        return selected_tags
+        return bestpath_tags
 
     def _calculate_phi(self, train_data: List[List[Tuple[str, str]]]):
         """
