@@ -125,3 +125,4 @@ ui-tests/.pnp.*
 
 # PyCharm
 .idea/
+Data/.DS_Store
