@@ -3,8 +3,8 @@ import math
 
 
 UNK_TOKEN = "UNK"
-START_TOKEN = "START"
-STOP_TOKEN = "STOP"
+START_TOKEN = "<START>"
+STOP_TOKEN = "<STOP>"
 
 
 class HMM:
@@ -187,6 +187,7 @@ class HMM:
         """
         predictions = []
         for sent in data:
+            # sent = ['<START>']+sent+['<STOP>']
             sent = [word.lower() for word in sent]
             try:
                 tokens = self._viterbi_algorithm(sent)
@@ -194,9 +195,9 @@ class HMM:
                 print("IE")
             predictions.append(tokens)
 
-        # predictions = [
-        #     self._remove_start_and_stop_tokens_in_prediction(p) for p in predictions
-        # ]
+        predictions = [
+            self._remove_start_and_stop_tokens_in_prediction(p) for p in predictions
+        ]
 
         return predictions
 
@@ -219,7 +220,7 @@ class HMM:
                 correct_count += 1
 
         accuracy = correct_count / len(tags)
-        return accuracy
+        return (accuracy, flattened_predictions, tags)
 
     def _viterbi_algorithm(self, sent: List[str]):
         """
@@ -659,7 +660,11 @@ class HMM:
             - if tags[0] == START_TOKEN -> remove
             - if tags[-1] == END_TOKEN -> remove
         """
-        pass
+        if tags[0] == START_TOKEN:
+            tags = tags.remove(START_TOKEN)
+        elif tags[-1] == STOP_TOKEN:
+            tags = tags.remove(STOP_TOKEN)
+        return tags
 
     def get_transition_matrix(self):
         return self.transition_matrix
