@@ -188,7 +188,10 @@ class HMM:
         predictions = []
         for sent in data:
             sent = [word.lower() for word in sent]
-            tokens = self._viterbi_algorithm(sent)
+            try:
+                tokens = self._viterbi_algorithm(sent)
+            except IndexError:
+                print("IE")
             predictions.append(tokens)
 
         # predictions = [
@@ -198,7 +201,25 @@ class HMM:
         return predictions
 
     def accuracy(self, data: List[List[Tuple[str, str]]]):
-        pass
+        """
+
+        :param data: input data upon which we predict and compare it with real tags
+        :return: accuracy given the trained model and input data
+        """
+
+        tags = [tag for sent in data for w, tag in sent]
+
+        words = [[word for word, t in sent] for sent in data]
+        predictions = self.predict(words)
+        flattened_predictions = [tag for sent in predictions for tag in sent]
+
+        correct_count = 0
+        for predicted_tag, real_tag in zip(flattened_predictions, tags):
+            if predicted_tag == real_tag:
+                correct_count += 1
+
+        accuracy = correct_count / len(tags)
+        return accuracy
 
     def _viterbi_algorithm(self, sent: List[str]):
         """
