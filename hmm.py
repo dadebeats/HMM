@@ -111,7 +111,7 @@ class HMM:
         self,
         train_data: List[List[Tuple[str, str]]],
         use_log_prob: bool = False,
-        smoothing_factor: Optional[float] = None,
+        smoothing_factor: Optional[float] = 1,
         apply_smoothing_in_emission_matrix: bool = False,
         apply_smoothing_in_transition_matrix: bool = False,
     ):
@@ -386,6 +386,8 @@ class HMM:
                     self.use_log_prob,
                     self.apply_smoothing_in_transition_matrix,
                     self.smoothing_factor,
+                    is_emission=False, 
+                    is_transition=True
                 )
 
             phi[tag] = value
@@ -455,6 +457,8 @@ class HMM:
                     self.use_log_prob,
                     self.apply_smoothing_in_emission_matrix,
                     self.smoothing_factor,
+                    is_emission=True, 
+                    is_transition=False
                 )
 
             # Store the tag's emission probabilities in the emission matrix
@@ -537,6 +541,8 @@ class HMM:
                     self.use_log_prob,
                     self.apply_smoothing_in_transition_matrix,
                     self.smoothing_factor,
+                    is_emission=False, 
+                    is_transition=True
                 )
 
         # Return the computed transition matrix
@@ -549,6 +555,8 @@ class HMM:
         use_log_prob: bool,
         is_smoothing_applied: bool,
         smoothing_factor: float,
+        is_emission: bool, 
+        is_transition: bool
     ):
         """
         Calculate the probability used in emission matrix / transition matrix.
@@ -569,38 +577,40 @@ class HMM:
                 - Type: float
                 - Example: 0.001, 2.0, -inf
         """
+        
         value = 0
-        if not (numerator + smoothing_factor) or not (denominator + smoothing_factor):
+
+        if is_smoothing_applied:
+            if not smoothing_factor:
+                print("WARNING: Smoothing is applied but smoothing_factor is set to 0!")
+            
+            if is_emission:
+                vocab_size = self.T  
+            elif is_transition:
+                vocab_size = self.N 
+            else:
+                print("WARNING: Smoothing is applied but neither emission nor transition flag is set!")
+                vocab_size = 1 
+
+            # Adjust the smoothing denominator based on vocabulary size
+            adjusted_denominator = denominator + smoothing_factor * vocab_size
+        else:
+            adjusted_denominator = denominator
+        
+        
+        if not (numerator + smoothing_factor) or not (adjusted_denominator):
             # if numerator + smoothing_factor = 0
             # or denominator + smoothing_factor = 0
             # automatically set the probability
             value = self.INIT_PROB_VALUE
             return value
-
+        
+        
         if not use_log_prob:
-            if not is_smoothing_applied:
-                value = numerator / denominator
-            else:
-                if not smoothing_factor:
-                    print(
-                        "WARNING: Smoothing is applied but smoothing_factor is set to 0!"
-                    )
-                value = (numerator + smoothing_factor) / (
-                    denominator + smoothing_factor
-                )
+            value = (numerator + smoothing_factor) / adjusted_denominator
         else:
             # rules of log: log(A/B) - log A - log B
-            if not is_smoothing_applied:
-                # if no smoothing factor, means numerator or denominator maybe 0
-                value = math.log(numerator) - math.log(denominator)
-            else:
-                if not smoothing_factor:
-                    print(
-                        "WARNING: Smoothing is applied but smoothing_factor is set to 0!"
-                    )
-                value = math.log(numerator + smoothing_factor) - math.log(
-                    denominator + smoothing_factor
-                )
+            value = math.log(numerator + smoothing_factor) - math.log(adjusted_denominator)
 
         return value
 
