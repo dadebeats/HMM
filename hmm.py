@@ -188,7 +188,7 @@ class HMM:
         predictions = []
         for sent in data:
             # sent = ['<START>']+sent+['<STOP>']
-            sent = [word.lower() for word in sent]
+            sent = [word.lower().strip() for word in sent]
             try:
                 tokens = self._viterbi_algorithm(sent)
             except IndexError:
@@ -456,7 +456,7 @@ class HMM:
         for sentence_data in train_data:
             for word, tag in sentence_data:
                 # Normalize word by converting it to lowercase
-                word = word.lower()
+                word = word.lower().strip()
 
                 if tag in tag_word_counts:
                     # If the tag exists in tag_word_counts, update word count
